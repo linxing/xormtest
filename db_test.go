@@ -23,8 +23,20 @@ var (
 	}
 )
 
-func TestNewDB(t *testing.T) {
-	mockdb, err := NewDB("xorm_test", beans...)
+func TestNewMySQLDB(t *testing.T) {
+	mockdb, err := NewDB("mysql", "root:root@tcp(localhost:3306)/", "xormtest", beans...)
+	require.NoError(t, err)
+
+	defer mockdb.Close()
+
+	tables, err := mockdb.engine.DBMetas()
+	require.NoError(t, err)
+
+	assert.Len(t, tables, len(beans))
+}
+
+func TestNewPostgresDB(t *testing.T) {
+	mockdb, err := NewDB("postgres", "user=postgres password=postgres host=localhost port=5432 sslmode=disable", "xormtest", beans...)
 	require.NoError(t, err)
 
 	defer mockdb.Close()
