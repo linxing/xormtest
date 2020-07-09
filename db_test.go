@@ -46,3 +46,15 @@ func TestNewPostgresDB(t *testing.T) {
 
 	assert.Len(t, tables, len(beans))
 }
+
+/*func TestNewSqlite3DB(t *testing.T) {
+	mockdb, err := NewDB("sqlite3", "test.db", "xormtest", beans...)
+	require.NoError(t, err)
+
+	defer mockdb.Close()
+
+	tables, err := mockdb.engine.DBMetas()
+	require.NoError(t, err)
+
+	assert.Len(t, tables, len(beans))
+}*/

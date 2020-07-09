@@ -1,11 +1,11 @@
 package xormtest
 
 import (
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	"xorm.io/xorm"
 )
 
@@ -48,15 +48,14 @@ func NewDB(driver string, dataSourceName string, dbName string, beans ...interfa
 
 	switch driver {
 	case "postgres":
-		engine, err = xorm.NewEngine("postgres", dataSourceName+" dbname="+dbName)
-		if err != nil {
-			return nil, err
-		}
+		engine, err = xorm.NewEngine(driver, dataSourceName+" dbname="+dbName)
+	case "sqlite3":
+		engine, err = xorm.NewEngine(driver, dataSourceName)
 	default:
-		engine, err = xorm.NewEngine("mysql", dataSourceName+dbName)
-		if err != nil {
-			return nil, err
-		}
+		engine, err = xorm.NewEngine(driver, dataSourceName+dbName)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	db := &DB{
@@ -78,36 +77,36 @@ func NewDB(driver string, dataSourceName string, dbName string, beans ...interfa
 
 func createDatabase(driver string, dataSourceName string, dbName string) error {
 
-	switch driver {
-	case "postgres":
-		engine, err := xorm.NewEngine("postgres", dataSourceName+" dbname=postgres")
-		if err != nil {
-			return err
-		}
+	var err error
+	var engine *xorm.Engine
 
-		defer engine.Close()
-
-		_, err = engine.Exec("CREATE DATABASE " + dbName)
-		if err != nil {
-			if pqerr, ok := err.(*pq.Error); ok && pqerr.Code != "42P04" {
-				fmt.Println(pqerr.Code)
-				return err
-			}
-		}
-
-		return nil
-
-	default:
-		engine, err := xorm.NewEngine("mysql", dataSourceName)
-		if err != nil {
-			return err
-		}
-
-		defer engine.Close()
-
-		_, err = engine.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
+	if driver == "postgres" {
+		engine, err = xorm.NewEngine(driver, dataSourceName+" dbname=postgres")
+	} else {
+		engine, err = xorm.NewEngine(driver, dataSourceName)
+	}
+	if err != nil {
 		return err
 	}
+
+	if driver == "postgres" {
+		if _, err = engine.Exec("CREATE DATABASE " + dbName); err != nil {
+
+			if pqerr, ok := err.(*pq.Error); ok && pqerr.Code == "42P04" {
+				engine.Close()
+				return nil
+			}
+		}
+	} else if driver != "sqlite3" {
+		_, err = engine.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
+	}
+
+	if err != nil {
+		engine.Close()
+		return err
+	}
+
+	return engine.Close()
 }
 
 func dropTables(dbEngine *xorm.Engine, dbName string, tables []interface{}) error {
