@@ -64,6 +64,12 @@ func NewDB(driver string, dataSourceName string, dbName string, beans ...interfa
 		tables: beans,
 	}
 
+	// to make sure database was empty
+	err = db.engine.DropTables(beans...)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := db.initDB(beans); err != nil {
 		err := db.Close()
 		if err != nil {
