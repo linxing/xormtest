@@ -1,6 +1,7 @@
 package xormtest
 
 import (
+	"database/sql"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -15,7 +16,7 @@ type DB struct {
 	tables []interface{}
 }
 
-// Close drop databases and close database connection
+// Close drop tables and close database connection
 func (db *DB) Close() error {
 	// close database connection
 	defer db.engine.Close()
@@ -84,35 +85,35 @@ func NewDB(driver string, dataSourceName string, dbName string, beans ...interfa
 func createDatabase(driver string, dataSourceName string, dbName string) error {
 
 	var err error
-	var engine *xorm.Engine
+	var db *sql.DB
 
 	if driver == "postgres" {
-		engine, err = xorm.NewEngine(driver, dataSourceName+" dbname=postgres")
+		db, err = sql.Open(driver, dataSourceName+" dbname=postgres")
 	} else {
-		engine, err = xorm.NewEngine(driver, dataSourceName)
+		db, err = sql.Open(driver, dataSourceName)
 	}
 	if err != nil {
 		return err
 	}
 
+	defer db.Close()
+
 	if driver == "postgres" {
-		if _, err = engine.Exec("CREATE DATABASE " + dbName); err != nil {
+		if _, err = db.Exec("CREATE DATABASE " + dbName); err != nil {
 
 			if pqerr, ok := err.(*pq.Error); ok && pqerr.Code == "42P04" {
-				engine.Close()
 				return nil
 			}
 		}
 	} else if driver != "sqlite3" {
-		_, err = engine.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
+		_, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
 	}
 
 	if err != nil {
-		engine.Close()
 		return err
 	}
 
-	return engine.Close()
+	return nil
 }
 
 func dropTables(dbEngine *xorm.Engine, dbName string, tables []interface{}) error {
