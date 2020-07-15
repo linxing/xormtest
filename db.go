@@ -2,7 +2,10 @@ package xormtest
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
@@ -13,15 +16,18 @@ import (
 type DB struct {
 	engine *xorm.Engine
 	name   string
-	tables []interface{}
 }
 
-// Close drop tables and close database connection
-func (db *DB) Close() error {
+// Close drop database and close database connection
+func (db *DB) Close() (err error) {
+	// drop database
+	defer func() {
+		if e := dropDatabase(db.engine.DriverName(), db.engine.DataSourceName(), db.name); e != nil {
+			err = e
+		}
+	}()
 	// close database connection
-	defer db.engine.Close()
-	// drop tables
-	return dropTables(db.engine, db.name, db.tables)
+	return db.engine.Close()
 }
 
 func (db *DB) initDB(beans []interface{}) error {
@@ -43,7 +49,8 @@ func NewDB(driver string, dataSourceName string, dbName string, beans ...interfa
 	var engine *xorm.Engine
 	var err error
 
-	if err = createDatabase(driver, dataSourceName, dbName); err != nil {
+	dbName = getDBNameWithPrefix(dbName)
+	if err := createDatabase(driver, dataSourceName, dbName); err != nil {
 		return nil, err
 	}
 
@@ -62,13 +69,6 @@ func NewDB(driver string, dataSourceName string, dbName string, beans ...interfa
 	db := &DB{
 		engine: engine,
 		name:   dbName,
-		tables: beans,
-	}
-
-	// to make sure database was empty
-	err = db.engine.DropTables(beans...)
-	if err != nil {
-		return nil, err
 	}
 
 	if err := db.initDB(beans); err != nil {
@@ -100,22 +100,47 @@ func createDatabase(driver string, dataSourceName string, dbName string) error {
 
 	if driver == "postgres" {
 		if _, err = db.Exec("CREATE DATABASE " + dbName); err != nil {
-
 			if pqerr, ok := err.(*pq.Error); ok && pqerr.Code == "42P04" {
 				return nil
 			}
 		}
 	} else if driver != "sqlite3" {
 		_, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func dropDatabase(driver string, dataSourceName string, dbName string) error {
+
+	var err error
+	var db *sql.DB
+
+	if driver == "postgres" {
+		db, err = sql.Open(driver, dataSourceName+" dbname=postgres")
+	} else {
+		db, err = sql.Open(driver, dataSourceName)
 	}
 
 	if err != nil {
 		return err
 	}
 
-	return nil
+	defer db.Close()
+
+	if driver == "sqlite3" {
+		err = os.Remove(dataSourceName)
+	} else {
+		_, err = db.Exec("DROP DATABASE " + dbName)
+	}
+
+	return err
 }
 
-func dropTables(dbEngine *xorm.Engine, dbName string, tables []interface{}) error {
-	return dbEngine.DropTables(tables...)
+func getDBNameWithPrefix(dbName string) string {
+	ts := time.Now().UnixNano()
+	return fmt.Sprintf("%s_%d", dbName, ts)
 }
