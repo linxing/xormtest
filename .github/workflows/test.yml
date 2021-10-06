@@ -9,9 +9,9 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Golang Lint
-      uses: golangci/golangci-lint-action@v1
+      uses: golangci/golangci-lint-action@v2
       with:
-        version: v1.26
+        version: latest
 
   test:
     name: Test
