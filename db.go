@@ -82,6 +82,45 @@ func NewDB(driver string, dataSourceName string, dbName string, beans ...interfa
 	return db, nil
 }
 
+func NewCustomizePrefixDB(driver string, dataSourceName string, dbName string, databasePrefix string, beans ...interface{}) (*DB, error) {
+
+	var engine *xorm.Engine
+	var err error
+
+	dbName = databasePrefix + dbName
+
+	if err := createDatabase(driver, dataSourceName, dbName); err != nil {
+		return nil, err
+	}
+
+	switch driver {
+	case "postgres":
+		engine, err = xorm.NewEngine(driver, dataSourceName+" dbname="+dbName)
+	case "sqlite3":
+		engine, err = xorm.NewEngine(driver, dataSourceName)
+	default:
+		engine, err = xorm.NewEngine(driver, dataSourceName+dbName)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	db := &DB{
+		engine: engine,
+		name:   dbName,
+	}
+
+	if err := db.initDB(beans); err != nil {
+		err := db.Close()
+		if err != nil {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	return db, nil
+}
+
 func createDatabase(driver string, dataSourceName string, dbName string) error {
 
 	var err error
